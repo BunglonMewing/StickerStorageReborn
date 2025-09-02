@@ -96,34 +96,46 @@
 
     <!-- Profile Section -->
     <section id="profile-section" class="p-4 hidden">
-      <div class="bg-white rounded-lg shadow p-6 mb-6">
-        <div class="flex items-center space-x-4 mb-4">
-          <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center text-white text-2xl">
-            <i class="fas fa-user"></i>
+      <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <!-- Avatar and Username -->
+          <div class="flex items-center space-x-4 mb-4 sm:mb-0">
+            <div class="w-16 h-16 sm:w-24 sm:h-24 bg-purple-500 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl">
+              <i class="fas fa-user"></i>
+            </div>
+            <div>
+              <h2 id="profile-username" class="text-xl sm:text-2xl font-bold">Username</h2>
+              <p id="profile-email" class="text-gray-500">user@example.com</p>
+            </div>
           </div>
-          <div>
-            <h2 id="profile-username" class="text-xl font-bold">Username</h2>
-            <p id="profile-email" class="text-gray-500">user@example.com</p>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-4 text-center border-t border-gray-200 pt-4">
-          <div>
-            <p class="font-bold" id="posts-count">0</p>
-            <p class="text-gray-500 text-sm">Posts</p>
-          </div>
-          <div>
-            <p class="font-bold" id="followers-count">0</p>
-            <p class="text-gray-500 text-sm">Followers</p>
-          </div>
-          <div>
-            <p class="font-bold" id="following-count">0</p>
-            <p class="text-gray-500 text-sm">Following</p>
+          <!-- Stats and Buttons -->
+          <div class="flex flex-col sm:items-end">
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-4 text-center border-y border-gray-200 sm:border-none py-4 sm:py-0 my-4 sm:my-0 sm:flex sm:space-x-8 sm:mb-4">
+              <div>
+                <p class="font-bold text-lg" id="posts-count">0</p>
+                <p class="text-gray-500 text-sm">Posts</p>
+              </div>
+              <div>
+                <p class="font-bold text-lg" id="followers-count">0</p>
+                <p class="text-gray-500 text-sm">Followers</p>
+              </div>
+              <div>
+                <p class="font-bold text-lg" id="following-count">0</p>
+                <p class="text-gray-500 text-sm">Following</p>
+              </div>
+            </div>
+            <!-- Buttons -->
+            <div class="flex space-x-2">
+              <button id="edit-profile-btn" class="flex-1 sm:flex-none bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300 transition text-sm font-semibold">Edit Profile</button>
+              <button id="logout-btn" class="flex-1 sm:flex-none bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition text-sm font-semibold">Log Out</button>
+            </div>
           </div>
         </div>
       </div>
       
       <h3 class="text-lg font-semibold mb-4">Your Memes</h3>
-      <div id="user-posts" class="grid grid-cols-2 gap-4">
+      <div id="user-posts" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4">
         <!-- User posts will be loaded here -->
       </div>
     </section>
@@ -283,6 +295,7 @@
       document.getElementById('email-auth-form').addEventListener('submit', handleLogin);
       document.getElementById('register-btn').addEventListener('click', handleRegister);
       document.getElementById('github-login').addEventListener('click', () => signInWithProvider('github'));
+      document.getElementById('logout-btn').addEventListener('click', handleLogout);
     }
 
     // Handle Email/Password Login
@@ -621,6 +634,19 @@
       } catch (error) {
         console.error('Error signing in:', error);
         alert('Error signing in. Please try again.');
+      }
+    }
+
+    // Handle Logout
+    async function handleLogout() {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        // The onAuthStateChange listener should handle the UI update
+        // but a reload can be a good fallback
+        window.location.reload();
+      } catch (error) {
+        alert(error.message);
       }
     }
   </script>
