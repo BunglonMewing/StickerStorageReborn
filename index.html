@@ -169,16 +169,33 @@
     <div class="bg-white rounded-lg w-full max-w-md">
       <div class="p-6">
         <h2 class="text-2xl font-bold mb-6 text-center">Welcome to StickerStorage</h2>
-        <div class="space-y-4">
-          <button id="google-login" class="w-full bg-red-500 text-white py-2 px-4 rounded flex items-center justify-center space-x-2 hover:bg-red-600 transition">
-            <i class="fab fa-google"></i>
-            <span>Continue with Google</span>
-          </button>
-          <button id="github-login" class="w-full bg-gray-800 text-white py-2 px-4 rounded flex items-center justify-center space-x-2 hover:bg-gray-900 transition">
-            <i class="fab fa-github"></i>
-            <span>Continue with GitHub</span>
-          </button>
+
+        <form id="email-auth-form" class="space-y-4">
+          <div>
+            <label for="email-input" class="sr-only">Email</label>
+            <input type="email" id="email-input" placeholder="Email" required class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500">
+          </div>
+          <div>
+            <label for="password-input" class="sr-only">Password</label>
+            <input type="password" id="password-input" placeholder="Password" required class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500">
+          </div>
+          <div class="flex space-x-2">
+            <button type="submit" id="login-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition">Login</button>
+            <button type="button" id="register-btn" class="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition">Register</button>
+          </div>
+        </form>
+
+        <div class="relative flex py-5 items-center">
+            <div class="flex-grow border-t border-gray-300"></div>
+            <span class="flex-shrink mx-4 text-gray-400">OR</span>
+            <div class="flex-grow border-t border-gray-300"></div>
         </div>
+
+        <button id="github-login" class="w-full bg-gray-800 text-white py-2 px-4 rounded flex items-center justify-center space-x-2 hover:bg-gray-900 transition">
+          <i class="fab fa-github"></i>
+          <span>Continue with GitHub</span>
+        </button>
+
         <p class="text-center text-gray-500 text-sm mt-6">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
@@ -263,8 +280,45 @@
       document.getElementById('search-input').addEventListener('input', handleSearch);
       
       // Auth
-      document.getElementById('google-login').addEventListener('click', () => signInWithProvider('google'));
+      document.getElementById('email-auth-form').addEventListener('submit', handleLogin);
+      document.getElementById('register-btn').addEventListener('click', handleRegister);
       document.getElementById('github-login').addEventListener('click', () => signInWithProvider('github'));
+    }
+
+    // Handle Email/Password Login
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email-input').value;
+      const password = document.getElementById('password-input').value;
+
+      try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // The onAuthStateChange listener will handle hiding the modal
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    // Handle Email/Password Registration
+    async function handleRegister() {
+      const email = document.getElementById('email-input').value;
+      const password = document.getElementById('password-input').value;
+
+      if (!email || !password) {
+        alert("Please provide both an email and a password.");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Registration successful! Please check your email to verify your account.');
+        // If you have email verification enabled, the user is returned, but session is null
+        // The onAuthStateChange will be triggered once the user verifies their email
+      } catch (error) {
+        alert(error.message);
+      }
     }
     
     // Show/hide sections
@@ -559,7 +613,7 @@
         const { error } = await supabase.auth.signInWithOAuth({
           provider: provider,
           options: {
-            redirectTo: window.location.origin
+            redirectTo: 'https://stickerstorageid.nelify.app'
           }
         });
         
