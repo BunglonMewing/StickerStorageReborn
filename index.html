@@ -23,6 +23,49 @@
     .post-image {
       max-height: 400px;
       object-fit: contain;
+      transition: transform 0.2s ease-in-out;
+    }
+    .post-image:hover {
+      transform: scale(1.02);
+    }
+    .like-btn.liked {
+      color: #ef4444; /* red-500 */
+    }
+    .modal-content {
+      animation: slide-up 0.4s ease-out;
+    }
+    @keyframes slide-up {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    nav[role="navigation"] button {
+      transition: all 0.2s ease-in-out;
+    }
+    nav[role="navigation"] button:hover {
+      transform: translateY(-2px);
+      color: #4f46e5;
+    }
+    /* Responsive */
+    @media (max-width: 640px) {
+      nav[role="navigation"] {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+      }
+      nav[role="navigation"] button i {
+        font-size: 1.75rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+      }
+      .post-image {
+        max-height: 350px;
+      }
     }
   </style>
 </head>
@@ -71,24 +114,30 @@
 
     <!-- Upload Modal -->
     <div id="upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
-      <div class="bg-white rounded-lg w-full max-w-md">
+      <div class="bg-white rounded-lg w-full max-w-md modal-content">
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 class="text-lg font-semibold">Upload a Meme</h3>
+          <h3 class="text-lg font-semibold">Upload a Sticker</h3>
           <button id="close-upload-modal" class="text-gray-500 hover:text-gray-700">
             <i class="fas fa-times"></i>
           </button>
         </div>
         <div class="p-4">
           <form id="upload-form">
+            <!-- Image Preview -->
+            <div id="image-preview-container" class="mb-4 hidden">
+                <img id="image-preview" src="#" alt="Image preview" class="max-h-48 w-auto mx-auto rounded"/>
+            </div>
             <div class="mb-4">
-              <label class="block text-gray-700 mb-2" for="meme-image">Meme Image</label>
+              <label class="block text-gray-700 mb-2" for="meme-image">Sticker Image</label>
               <input type="file" id="meme-image" accept="image/*" class="w-full p-2 border border-gray-300 rounded" required>
             </div>
             <div class="mb-4">
               <label class="block text-gray-700 mb-2" for="meme-title">Title (optional)</label>
-              <input type="text" id="meme-title" placeholder="Add a title..." class="w-full p-2 border border-gray-300 rounded">
+              <input type="text" id="meme-title" placeholder="A funny or descriptive title..." class="w-full p-2 border border-gray-300 rounded">
             </div>
-            <button type="submit" class="w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition">Upload Meme</button>
+            <!-- Error Message -->
+            <div id="upload-error" class="text-red-500 text-sm mb-4 text-center hidden"></div>
+            <button type="submit" class="w-full bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition font-semibold">Upload Sticker</button>
           </form>
         </div>
       </div>
@@ -151,6 +200,14 @@
         </div>
       </div>
     </section>
+
+    <!-- Favorites Section -->
+    <section id="favorites-section" class="p-4 hidden">
+      <h2 class="text-xl font-bold mb-4">Favorites</h2>
+      <div id="favorite-posts-container" class="space-y-6">
+        <!-- Favorite posts will be loaded here -->
+      </div>
+    </section>
   </main>
 
   <!-- Bottom navigation -->
@@ -178,7 +235,7 @@
 
   <!-- Auth Modal -->
   <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg w-full max-w-md">
+    <div class="bg-white rounded-lg w-full max-w-md modal-content">
       <div class="p-6">
         <h2 class="text-2xl font-bold mb-6 text-center">Welcome to StickerStorage</h2>
 
@@ -230,7 +287,8 @@
       home: document.getElementById('home-section'),
       search: document.getElementById('search-section'),
       profile: document.getElementById('profile-section'),
-      notifications: document.getElementById('notifications-section')
+      notifications: document.getElementById('notifications-section'),
+      favorites: document.getElementById('favorites-section')
     };
     
     const navButtons = {
@@ -270,6 +328,7 @@
         } else if (event === 'SIGNED_OUT') {
           currentUser = null;
           document.getElementById('auth-modal').classList.remove('hidden');
+          window.location.reload(); // Reload to clear state
         }
       });
     }
@@ -279,6 +338,7 @@
       // Navigation
       navButtons.home.addEventListener('click', () => showSection('home'));
       navButtons.search.addEventListener('click', () => showSection('search'));
+      navButtons.favorites.addEventListener('click', () => showSection('favorites'));
       navButtons.profile.addEventListener('click', () => showSection('profile'));
       document.getElementById('profile-btn').addEventListener('click', () => showSection('profile'));
       document.getElementById('notifications-btn').addEventListener('click', () => showSection('notifications'));
@@ -287,6 +347,7 @@
       navButtons.upload.addEventListener('click', showUploadModal);
       document.getElementById('close-upload-modal').addEventListener('click', hideUploadModal);
       document.getElementById('upload-form').addEventListener('submit', handleUpload);
+      document.getElementById('meme-image').addEventListener('change', handleImagePreview);
       
       // Search
       document.getElementById('search-input').addEventListener('input', handleSearch);
@@ -296,6 +357,11 @@
       document.getElementById('register-btn').addEventListener('click', handleRegister);
       document.getElementById('github-login').addEventListener('click', () => signInWithProvider('github'));
       document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+      // Post interactions (likes)
+      document.getElementById('posts-container').addEventListener('click', handlePostInteraction);
+      document.getElementById('favorite-posts-container').addEventListener('click', handlePostInteraction);
+      document.getElementById('search-results').addEventListener('click', handlePostInteraction);
     }
 
     // Handle Email/Password Login
@@ -307,7 +373,6 @@
       try {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // The onAuthStateChange listener will handle hiding the modal
       } catch (error) {
         alert(error.message);
       }
@@ -327,8 +392,6 @@
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         alert('Registration successful! Please check your email to verify your account.');
-        // If you have email verification enabled, the user is returned, but session is null
-        // The onAuthStateChange will be triggered once the user verifies their email
       } catch (error) {
         alert(error.message);
       }
@@ -336,33 +399,37 @@
     
     // Show/hide sections
     function showSection(section) {
-      // Hide all sections
       Object.values(mainSections).forEach(el => el.classList.add('hidden'));
-      
-      // Show the selected section
       mainSections[section].classList.remove('hidden');
       
-      // Update active nav
       Object.values(navButtons).forEach(btn => btn.classList.remove('active-nav'));
       
-      if (section === 'home') navButtons.home.classList.add('active-nav');
-      else if (section === 'search') navButtons.search.classList.add('active-nav');
-      else if (section === 'profile') navButtons.profile.classList.add('active-nav');
-      
+      if (navButtons[section]) {
+          navButtons[section].classList.add('active-nav');
+      }
+
+      // Special case for top-right profile button
+      if (section === 'profile') {
+        navButtons.profile.classList.add('active-nav');
+      }
+
       currentSection = section;
       
-      // Section-specific actions
       if (section === 'search') {
         document.getElementById('search-input').focus();
       } else if (section === 'notifications') {
         loadNotifications();
+      } else if (section === 'favorites') {
+        loadFavoritePosts();
+      } else if (section === 'home') {
+          loadPosts();
       }
     }
     
     // Upload modal functions
     function showUploadModal() {
       if (!currentUser) {
-        alert('Please sign in to upload memes');
+        alert('Please sign in to upload stickers');
         return;
       }
       document.getElementById('upload-modal').classList.remove('hidden');
@@ -371,6 +438,26 @@
     function hideUploadModal() {
       document.getElementById('upload-modal').classList.add('hidden');
       document.getElementById('upload-form').reset();
+      document.getElementById('image-preview-container').classList.add('hidden');
+      document.getElementById('image-preview').src = "#";
+      const errorDiv = document.getElementById('upload-error');
+      errorDiv.classList.add('hidden');
+      errorDiv.textContent = '';
+    }
+
+    function handleImagePreview(e) {
+      const file = e.target.files[0];
+      if (file) {
+          const reader = new FileReader();
+          const previewContainer = document.getElementById('image-preview-container');
+          const previewImage = document.getElementById('image-preview');
+
+          reader.onload = function(e) {
+              previewImage.src = e.target.result;
+              previewContainer.classList.remove('hidden');
+          }
+          reader.readAsDataURL(file);
+      }
     }
     
     // Handle meme upload
@@ -379,50 +466,55 @@
       
       const fileInput = document.getElementById('meme-image');
       const titleInput = document.getElementById('meme-title');
-      
+      const submitButton = e.target.querySelector('button[type="submit"]');
+      const errorDiv = document.getElementById('upload-error');
+
+      // Clear previous errors
+      errorDiv.classList.add('hidden');
+      errorDiv.textContent = '';
+
       if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Please select an image to upload');
+        errorDiv.textContent = 'Please select an image to upload.';
+        errorDiv.classList.remove('hidden');
         return;
       }
       
+      submitButton.disabled = true;
+      submitButton.textContent = 'Uploading...';
+
       const file = fileInput.files[0];
-      const title = titleInput.value || 'Untitled Meme';
+      const title = titleInput.value || 'Untitled Sticker';
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
       const filePath = `memes/${fileName}`;
       
       try {
-        // Upload image to Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('memes')
           .upload(filePath, file);
         
         if (uploadError) throw uploadError;
         
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('memes')
           .getPublicUrl(filePath);
         
-        // Insert post into database
         const { error: dbError } = await supabase
           .from('posts')
-          .insert([
-            { 
-              image_url: publicUrl, 
-              title: title,
-              user_id: currentUser.id 
-            }
-          ]);
+          .insert([{ image_url: publicUrl, title: title, user_id: currentUser.id }]);
         
         if (dbError) throw dbError;
         
-        alert('Meme uploaded successfully!');
+        alert('Sticker uploaded successfully!');
         hideUploadModal();
-        loadPosts();
+        showSection('home');
       } catch (error) {
-        console.error('Error uploading meme:', error);
-        alert('Error uploading meme. Please try again.');
+        console.error('Error uploading sticker:', error);
+        errorDiv.textContent = `Upload failed: ${error.message}`;
+        errorDiv.classList.remove('hidden');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Upload Sticker';
       }
     }
     
@@ -431,10 +523,7 @@
       try {
         const { data: posts, error } = await supabase
           .from('posts')
-          .select(`
-            *,
-            profiles:user_id (username)
-          `)
+          .select(`*, profiles:user_id (username)`)
           .order('created_at', { ascending: false });
         
         if (error) throw error;
@@ -442,98 +531,63 @@
         const postsContainer = document.getElementById('posts-container');
         
         if (posts && posts.length > 0) {
-          postsContainer.innerHTML = posts.map(post => `
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-              <div class="p-4 flex items-center space-x-3">
-                <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white">
-                  <i class="fas fa-user"></i>
-                </div>
-                <div>
-                  <p class="font-semibold">${post.profiles?.username || 'Unknown User'}</p>
-                  <p class="text-gray-500 text-sm">${new Date(post.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div class="post-container">
-                ${post.title ? `<p class="px-4 pb-2 font-medium">${post.title}</p>` : ''}
-                <img src="${post.image_url}" alt="${post.title}" class="w-full post-image">
-              </div>
-              <div class="p-4 flex justify-between border-t border-gray-200">
-                <button class="text-gray-500 hover:text-red-500 focus:outline-none">
-                  <i class="fas fa-heart"></i>
-                  <span class="ml-1">Like</span>
-                </button>
-                <button class="text-gray-500 hover:text-blue-500 focus:outline-none">
-                  <i class="fas fa-comment"></i>
-                  <span class="ml-1">Comment</span>
-                </button>
-                <button class="text-gray-500 hover:text-green-500 focus:outline-none">
-                  <i class="fas fa-share"></i>
-                  <span class="ml-1">Share</span>
-                </button>
-              </div>
-            </div>
-          `).join('');
+          await enrichPostsWithLikes(posts);
+          postsContainer.innerHTML = posts.map(post => generatePostHTML(post)).join('');
         } else {
-          postsContainer.innerHTML = `
-            <div class="text-center py-12 text-gray-500">
-              <i class="fas fa-image text-4xl mb-3"></i>
-              <p>No memes yet. Be the first to share!</p>
-            </div>
-          `;
+          postsContainer.innerHTML = `<div class="text-center py-12 text-gray-500"><i class="fas fa-image text-4xl mb-3"></i><p>No memes yet. Be the first to share!</p></div>`;
         }
       } catch (error) {
         console.error('Error loading posts:', error);
+        document.getElementById('posts-container').innerHTML = `<div class="text-center py-12 text-gray-500"><p>Could not load posts. Check the console for errors.</p></div>`;
       }
+    }
+
+    // Enrich posts with like counts and user like status
+    async function enrichPostsWithLikes(posts) {
+        if (!posts || posts.length === 0) return;
+
+        const postIds = posts.map(p => p.id);
+        const { data: likes, error } = await supabase
+            .from('likes')
+            .select('post_id, user_id')
+            .in('post_id', postIds);
+
+        if (error) {
+            console.error("Error fetching likes:", error);
+            return;
+        }
+
+        posts.forEach(post => {
+            const postLikes = likes ? likes.filter(like => like.post_id === post.id) : [];
+            post.likes_count = postLikes.length;
+            post.user_has_liked = currentUser ? postLikes.some(like => like.user_id === currentUser.id) : false;
+        });
     }
     
     // Handle search functionality
     async function handleSearch(e) {
       const searchTerm = e.target.value.trim();
+      const resultsContainer = document.getElementById('search-results');
       
       if (searchTerm.length < 2) {
-        document.getElementById('search-results').innerHTML = '';
+        resultsContainer.innerHTML = '';
         return;
       }
       
       try {
         const { data: posts, error } = await supabase
           .from('posts')
-          .select(`
-            *,
-            profiles:user_id (username)
-          `)
+          .select(`*, profiles:user_id (username)`)
           .ilike('title', `%${searchTerm}%`)
           .order('created_at', { ascending: false });
         
         if (error) throw error;
         
-        const resultsContainer = document.getElementById('search-results');
-        
         if (posts && posts.length > 0) {
-          resultsContainer.innerHTML = posts.map(post => `
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-              <div class="p-4 flex items-center space-x-3">
-                <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white">
-                  <i class="fas fa-user"></i>
-                </div>
-                <div>
-                  <p class="font-semibold">${post.profiles?.username || 'Unknown User'}</p>
-                  <p class="text-gray-500 text-sm">${new Date(post.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div class="post-container">
-                ${post.title ? `<p class="px-4 pb-2 font-medium">${post.title}</p>` : ''}
-                <img src="${post.image_url}" alt="${post.title}" class="w-full post-image">
-              </div>
-            </div>
-          `).join('');
+          await enrichPostsWithLikes(posts);
+          resultsContainer.innerHTML = posts.map(post => generatePostHTML(post)).join('');
         } else {
-          resultsContainer.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-              <i class="fas fa-search text-3xl mb-3"></i>
-              <p>No memes found for "${searchTerm}"</p>
-            </div>
-          `;
+          resultsContainer.innerHTML = `<div class="text-center py-8 text-gray-500"><i class="fas fa-search text-3xl mb-3"></i><p>No memes found for "${searchTerm}"</p></div>`;
         }
       } catch (error) {
         console.error('Error searching posts:', error);
@@ -545,7 +599,6 @@
       if (!currentUser) return;
       
       try {
-        // Get user profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -554,21 +607,17 @@
         
         if (profileError) throw profileError;
         
-        // Update profile UI
         document.getElementById('profile-username').textContent = profile.username || 'User';
         document.getElementById('profile-email').textContent = currentUser.email;
         
-        // Get user's posts count
-        const { count: postsCount, error: postsError } = await supabase
+        const { count, error: postsError } = await supabase
           .from('posts')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'exact', head: true })
           .eq('user_id', currentUser.id);
         
         if (postsError) throw postsError;
+        document.getElementById('posts-count').textContent = count || 0;
         
-        document.getElementById('posts-count').textContent = postsCount || 0;
-        
-        // Load user's posts
         const { data: userPosts, error: userPostsError } = await supabase
           .from('posts')
           .select('*')
@@ -578,21 +627,10 @@
         if (userPostsError) throw userPostsError;
         
         const userPostsContainer = document.getElementById('user-posts');
-        
         if (userPosts && userPosts.length > 0) {
-          userPostsContainer.innerHTML = userPosts.map(post => `
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-              <img src="${post.image_url}" alt="${post.title}" class="w-full h-40 object-cover">
-              ${post.title ? `<p class="p-2 text-sm truncate">${post.title}</p>` : ''}
-            </div>
-          `).join('');
+          userPostsContainer.innerHTML = userPosts.map(post => `<div class="bg-white rounded-lg shadow overflow-hidden"><img src="${post.image_url}" alt="${post.title || 'User post'}" class="w-full h-40 object-cover"></div>`).join('');
         } else {
-          userPostsContainer.innerHTML= `
-            <div class="col-span-2 text-center py-8 text-gray-500">
-              <i class="fas fa-image text-3xl mb-3"></i>
-              <p>You haven't posted any memes yet</p>
-            </div>
-          `;
+          userPostsContainer.innerHTML= `<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-image text-3xl mb-3"></i><p>You haven't posted any memes yet</p></div>`;
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
@@ -601,23 +639,9 @@
     
     // Load notifications
     async function loadNotifications() {
-      if (!currentUser) return;
-      
-      try {
-        // In a real app, you would fetch notifications from your database
-        // This is a placeholder implementation
-        document.getElementById('notifications-list').innerHTML = `
-          <div class="text-center py-8 text-gray-500">
-            <i class="fas fa-bell-slash text-3xl mb-3"></i>
-            <p>No notifications yet</p>
-          </div>
-        `;
-        
-        // Reset notification count
-        document.getElementById('notification-count').classList.add('hidden');
-      } catch (error) {
-        console.error('Error loading notifications:', error);
-      }
+      // Placeholder
+      document.getElementById('notifications-list').innerHTML = `<div class="text-center py-8 text-gray-500"><i class="fas fa-bell-slash text-3xl mb-3"></i><p>No notifications yet</p></div>`;
+      document.getElementById('notification-count').classList.add('hidden');
     }
     
     // Sign in with provider
@@ -625,11 +649,8 @@
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: provider,
-          options: {
-            redirectTo: 'https://stickerstorageid.nelify.app'
-          }
+          options: { redirectTo: window.location.href }
         });
-        
         if (error) throw error;
       } catch (error) {
         console.error('Error signing in:', error);
@@ -642,12 +663,190 @@
       try {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
-        // The onAuthStateChange listener should handle the UI update
-        // but a reload can be a good fallback
-        window.location.reload();
       } catch (error) {
         alert(error.message);
       }
+    }
+
+    // Post Interaction
+    async function handlePostInteraction(e) {
+        const likeBtn = e.target.closest('.like-btn');
+        if (likeBtn) {
+            if (!currentUser) {
+                alert('Please sign in to like posts.');
+                return;
+            }
+            const postId = likeBtn.dataset.postId;
+            await toggleLike(postId);
+            return;
+        }
+
+        const commentBtn = e.target.closest('.comment-btn');
+        if (commentBtn) {
+            alert('The ability to comment is coming soon!');
+            return;
+        }
+
+        const shareBtn = e.target.closest('.share-btn');
+        if (shareBtn) {
+            const postId = shareBtn.dataset.postId;
+            handleShare(postId);
+            return;
+        }
+    }
+
+    async function handleShare(postId) {
+        const postCard = document.querySelector(`.like-btn[data-post-id="${postId}"]`).closest('.bg-white.rounded-lg');
+        if (!postCard) {
+            console.error("Could not find post card for sharing.");
+            return;
+        }
+
+        const imageUrlToShare = postCard.querySelector('.post-image')?.src;
+        const titleToShare = postCard.querySelector('.font-medium')?.textContent || 'Check out this sticker from StickerStorage!';
+
+        if (!imageUrlToShare) {
+            console.error("Could not find image URL to share.");
+            return;
+        }
+
+        const shareData = {
+            title: 'StickerStorage',
+            text: titleToShare,
+            url: imageUrlToShare
+        };
+
+        if (navigator.canShare && navigator.canShare(shareData)) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.log("Share action was cancelled or failed.", err);
+            }
+        } else if (navigator.clipboard) {
+            try {
+                await navigator.clipboard.writeText(imageUrlToShare);
+                alert('Sticker link copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy link: ', err);
+                alert('Oops, could not copy link.');
+            }
+        } else {
+            alert("Sharing is not supported on this browser.");
+        }
+    }
+
+    async function toggleLike(postId) {
+        const likeBtn = document.querySelector(`.like-btn[data-post-id="${postId}"]`);
+        const isLiked = likeBtn.classList.contains('liked');
+
+        if (isLiked) {
+            const { error } = await supabase.from('likes').delete().match({ user_id: currentUser.id, post_id: postId });
+            if (error) console.error("Error unliking:", error);
+            else updateLikeButtonUI(postId, false);
+        } else {
+            const { error } = await supabase.from('likes').insert({ user_id: currentUser.id, post_id: postId });
+            if (error) console.error("Error liking:", error);
+            else updateLikeButtonUI(postId, true);
+        }
+    }
+
+    function updateLikeButtonUI(postId, isLiked) {
+        const likeBtns = document.querySelectorAll(`.like-btn[data-post-id="${postId}"]`);
+        likeBtns.forEach(likeBtn => {
+            const countSpan = likeBtn.querySelector('[data-likes-count]');
+            if (!countSpan) return;
+            const currentCount = parseInt(countSpan.textContent);
+
+            if (isLiked) {
+                likeBtn.classList.add('liked');
+                countSpan.textContent = currentCount + 1;
+            } else {
+                likeBtn.classList.remove('liked');
+                countSpan.textContent = currentCount - 1;
+            }
+
+            if (currentSection === 'favorites' && !isLiked) {
+                const postElement = likeBtn.closest('.bg-white.rounded-lg');
+                if (postElement) {
+                    postElement.style.transition = 'opacity 0.3s ease';
+                    postElement.style.opacity = '0';
+                    setTimeout(() => {
+                        postElement.remove();
+                        const container = document.getElementById('favorite-posts-container');
+                        if (container.children.length === 0) {
+                            container.innerHTML = `<div class="text-center py-12 text-gray-500"><i class="fas fa-heart-broken text-4xl mb-3"></i><p>You haven't liked any posts yet.</p></div>`;
+                        }
+                    }, 300);
+                }
+            }
+        });
+    }
+
+    // Favorites Page
+    async function loadFavoritePosts() {
+        const container = document.getElementById('favorite-posts-container');
+        if (!currentUser) {
+            container.innerHTML = `<div class="text-center py-12 text-gray-500"><p>Please log in to see your favorites.</p></div>`;
+            return;
+        }
+
+        try {
+            const { data: likedPosts, error } = await supabase
+                .from('likes')
+                .select('posts(*, profiles:user_id(username))')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { foreignTable: 'posts', ascending: false });
+
+            if (error) throw error;
+
+            const posts = likedPosts.map(item => item.posts).filter(Boolean);
+
+            if (!posts || posts.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-gray-500"><i class="fas fa-heart-broken text-4xl mb-3"></i><p>You haven't liked any posts yet.</p></div>`;
+                return;
+            }
+
+            await enrichPostsWithLikes(posts);
+            container.innerHTML = posts.map(post => generatePostHTML(post)).join('');
+
+        } catch (error) {
+            console.error("Error loading favorite posts:", error);
+            container.innerHTML = `<div class="text-center py-12 text-gray-500"><p>Sorry, we couldn't load your favorite posts.</p></div>`;
+        }
+    }
+
+    // Reusable Post HTML
+    function generatePostHTML(post) {
+        return `
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+              <div class="p-4 flex items-center space-x-3">
+                <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white">
+                  <i class="fas fa-user"></i>
+                </div>
+                <div>
+                  <p class="font-semibold">${post.profiles?.username || 'Unknown User'}</p>
+                  <p class="text-gray-500 text-sm">${new Date(post.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+              <div class="post-container">
+                ${post.title ? `<p class="px-4 pb-2 font-medium">${post.title}</p>` : ''}
+                <img src="${post.image_url}" alt="${post.title}" class="w-full post-image">
+              </div>
+              <div class="p-4 flex justify-around items-center border-t border-gray-200">
+                <button class="like-btn text-gray-500 hover:text-red-500 focus:outline-none flex items-center flex-col space-y-1 ${post.user_has_liked ? 'liked' : ''}" data-post-id="${post.id}">
+                  <i class="fas fa-heart text-xl"></i>
+                  <span class="text-xs" data-likes-count>${post.likes_count || 0}</span>
+                </button>
+                <button class="comment-btn text-gray-500 hover:text-blue-500 focus:outline-none flex items-center flex-col space-y-1" data-post-id="${post.id}">
+                  <i class="fas fa-comment text-xl"></i>
+                  <span class="text-xs">Comment</span>
+                </button>
+                <button class="share-btn text-gray-500 hover:text-green-500 focus:outline-none flex items-center flex-col space-y-1" data-post-id="${post.id}">
+                  <i class="fas fa-share text-xl"></i>
+                  <span class="text-xs">Share</span>
+                </button>
+              </div>
+            </div>`;
     }
   </script>
 </body>
